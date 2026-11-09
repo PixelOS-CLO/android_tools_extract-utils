@@ -34,6 +34,10 @@ brotli_path = path.join(build_tools_dir, 'brotli')
 common_binaries_dir = path.join(android_root, 'prebuilts/extract-tools/common')
 apktool_path = path.join(common_binaries_dir, 'apktool/apktool.jar')
 
+sdk_framework_path = path.join(
+    android_root, 'prebuilts/sdk/current/public/android.jar'
+)
+
 jdk_binaries_dir = path.join(android_root, 'prebuilts/jdk/jdk21/linux-x86/bin')
 java_path = path.join(jdk_binaries_dir, 'java')
 

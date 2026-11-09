@@ -23,6 +23,7 @@ from extract_utils.tools import (
     java_path,
     llvm_strip_path,
     patchelf_version_path_map,
+    sdk_framework_path,
     stripzip_path,
 )
 from extract_utils.utils import (
@@ -38,6 +39,9 @@ APKTOOL_NO_SRC_ARG = '--no-src'
 APKTOOL_SRC_PATH_PREFIX = 'smali'
 APKTOOL_RES_PATH = 'res/'
 APKTOOL_ANDROID_MANIFEST_NAME = 'AndroidManifest.xml'
+APKTOOL_SDK_FRAMEWORK_DIR = path.join(
+    tempfile.gettempdir(), 'extract-utils-apktool-sdk-framework'
+)
 
 
 class BlobFixupCtx:
@@ -391,12 +395,27 @@ class blob_fixup:
         file_path: str,
         *args: Any,
         patches_path: str,
+        sdk_framework: bool = False,
         tmp_dir: Optional[str] = None,
         **kwargs: Any,
     ):
         assert tmp_dir is not None
 
         unpack_args = self.__get_apktool_unpack_args(ctx, patches_path)
+
+        if sdk_framework:
+            run_cmd(
+                [
+                    java_path,
+                    '-jar',
+                    apktool_path,
+                    'if',
+                    sdk_framework_path,
+                    '-p',
+                    APKTOOL_SDK_FRAMEWORK_DIR,
+                ]
+            )
+            unpack_args += ['-p', APKTOOL_SDK_FRAMEWORK_DIR]
 
         run_cmd(
             [
@@ -415,10 +434,12 @@ class blob_fixup:
     def apktool_unpack(
         self,
         patches_path: str,
+        sdk_framework: bool = False,
     ) -> blob_fixup:
         impl = partial(
             self.apktool_unpack_impl,
             patches_path=patches_path,
+            sdk_framework=sdk_framework,
         )
         return self.call(impl)
 
@@ -428,10 +449,15 @@ class blob_fixup:
         file: File,
         file_path: str,
         *args: Any,
+        sdk_framework: bool = False,
         tmp_dir: Optional[str] = None,
         **kwargs: Any,
     ):
         assert tmp_dir is not None
+
+        pack_args: List[str] = []
+        if sdk_framework:
+            pack_args += ['-p', APKTOOL_SDK_FRAMEWORK_DIR]
 
         run_cmd(
             [
@@ -443,10 +469,12 @@ class blob_fixup:
                 '-o',
                 file_path,
             ]
+            + pack_args
         )
 
-    def apktool_pack(self) -> blob_fixup:
-        return self.call(self.apktool_pack_impl, need_tmp_dir=True)
+    def apktool_pack(self, sdk_framework: bool = False) -> blob_fixup:
+        impl = partial(self.apktool_pack_impl, sdk_framework=sdk_framework)
+        return self.call(impl, need_tmp_dir=True)
 
     def stripzip_impl(
         self,
@@ -470,6 +498,7 @@ class blob_fixup:
         self,
         patches_path: str,
         *args: Any,
+        sdk_framework: bool = False,
     ) -> blob_fixup:
         if args:
             color_print(
@@ -477,9 +506,9 @@ class blob_fixup:
                 color=Color.YELLOW,
             )
 
-        self.apktool_unpack(patches_path)
+        self.apktool_unpack(patches_path, sdk_framework)
         self.patch_dir(patches_path)
-        self.apktool_pack()
+        self.apktool_pack(sdk_framework)
         self.stripzip()
         return self
 
